@@ -1,4 +1,4 @@
-# FUSIONRAG- 🧠📚
+# FUSIONRAG-CHATBOT 🧠📚
 
 **FUSIONRAG** is a local, privacy-preserving PDF Question Answering web application. It uses a Retrieval-Augmented Generation (RAG) pipeline to ingest PDF documents, store their contents in a vector database, and answer your questions intelligently using entirely local AI models. 
 
@@ -114,4 +114,3 @@ The application will now be available in your web browser at: **`http://127.0.0.
 * **No context found**: Ensure the PDF you uploaded contains selectable text (not just scanned images). `PyPDF2` requires actual text characters to extract.
 
 ---
-*Built with ❤️ using local AI tools.*
