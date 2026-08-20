@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF RAG Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fa-solid fa-file-pdf"></i> PDF Library</h2>
+            </div>
+            
+            <div class="upload-section">
+                <form id="upload-form">
+                    <label for="pdf-upload" class="upload-btn">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload PDF
+                    </label>
+                    <input type="file" id="pdf-upload" name="file" accept=".pdf" style="display: none;">
+                </form>
+                <div id="upload-status" class="status-text"></div>
+            </div>
+
+            <div class="files-list">
+                <h3>Indexed Documents</h3>
+                <ul id="document-list">
+                    <!-- Files will be injected here -->
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+            <header class="chat-header">
+                <h1>Local RAG Assistant</h1>
+                <p>Powered by Qwen + ChromaDB (100% Offline)</p>
+            </header>
+
+            <div class="chat-box" id="chat-box">
+                <!-- Welcome Message -->
+                <div class="message bot-message">
+                    <div class="message-content">
+                        <p>Hello! I am ready to answer questions based on your PDFs. Upload a document from the sidebar or ask a question below. You can also choose how detailed the answer should be!</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <form id="chat-form">
+                    <div class="marks-selector" id="marks-selector">
+                        <button type="button" class="marks-btn active" data-marks="2">2 Marks</button>
+                        <button type="button" class="marks-btn" data-marks="5">5 Marks</button>
+                        <button type="button" class="marks-btn" data-marks="10">10 Marks</button>
+                        <button type="button" class="marks-btn" data-marks="16">16 Marks</button>
+                    </div>
+                    <div class="input-row">
+                        <input type="text" id="query-input" placeholder="Ask something (e.g. 'what is descriptive analysis')..." autocomplete="off">
+                        <button type="submit" id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
