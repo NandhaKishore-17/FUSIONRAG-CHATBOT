@@ -3,65 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF RAG Assistant</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <title>FusionRAG — AI Study Assistant</title>
+    <meta name="description" content="FusionRAG is an offline AI-powered study assistant that answers questions from your PDFs using RAG technology.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2><i class="fa-solid fa-file-pdf"></i> PDF Library</h2>
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-top">
+                <div class="sidebar-brand">
+                    <div class="brand-icon">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <span class="brand-text">FusionRAG</span>
+                </div>
+                <button class="sidebar-toggle" id="sidebar-close" title="Close sidebar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
-            
+
             <div class="upload-section">
                 <form id="upload-form">
-                    <label for="pdf-upload" class="upload-btn">
-                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload PDF
+                    <label for="pdf-upload" class="upload-btn" id="upload-label">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Upload PDF</span>
                     </label>
                     <input type="file" id="pdf-upload" name="file" accept=".pdf" style="display: none;">
                 </form>
                 <div id="upload-status" class="status-text"></div>
             </div>
 
-            <div class="files-list">
-                <h3>Indexed Documents</h3>
+            <div class="files-section">
+                <div class="files-header">
+                    <span class="files-label">Your Documents</span>
+                    <span class="files-count" id="files-count">0</span>
+                </div>
                 <ul id="document-list">
-                    <!-- Files will be injected here -->
+                    <!-- Files injected here -->
                 </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="footer-info">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span>Powered by Qwen + ChromaDB</span>
+                </div>
+                <div class="footer-info">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>100% Offline & Private</span>
+                </div>
             </div>
         </aside>
 
         <!-- Main Chat Area -->
-        <main class="chat-container">
-            <header class="chat-header">
-                <h1>Local RAG Assistant</h1>
-                <p>Powered by Qwen + ChromaDB (100% Offline)</p>
+        <main class="chat-main">
+            <!-- Top bar -->
+            <header class="topbar">
+                <button class="sidebar-toggle" id="sidebar-open" title="Open sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="topbar-title">
+                    <span>FusionRAG</span>
+                </div>
+                <div class="topbar-model">
+                    <i class="fa-solid fa-circle" style="color: #10b981; font-size: 0.5rem;"></i>
+                    <span>Qwen · Local</span>
+                </div>
             </header>
 
+            <!-- Chat messages -->
             <div class="chat-box" id="chat-box">
-                <!-- Welcome Message -->
-                <div class="message bot-message">
-                    <div class="message-content">
-                        <p>Hello! I am ready to answer questions based on your PDFs. Upload a document from the sidebar or ask a question below. You can also choose how detailed the answer should be!</p>
+                <!-- Welcome screen -->
+                <div class="welcome-screen" id="welcome-screen">
+                    <div class="welcome-icon">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <h1 class="welcome-title">How can I help you today?</h1>
+                    <p class="welcome-subtitle">Upload a PDF and ask questions, or just say hello.</p>
+                    <div class="welcome-chips">
+                        <button class="chip" data-query="Summarize the key concepts from my documents">
+                            <i class="fa-regular fa-lightbulb"></i>
+                            <span>Summarize key concepts</span>
+                        </button>
+                        <button class="chip" data-query="What are the main topics covered?">
+                            <i class="fa-regular fa-compass"></i>
+                            <span>Main topics covered</span>
+                        </button>
+                        <button class="chip" data-query="Explain the most important definitions">
+                            <i class="fa-regular fa-bookmark"></i>
+                            <span>Important definitions</span>
+                        </button>
+                        <button class="chip" data-query="Hi! What can you do?">
+                            <i class="fa-regular fa-comment"></i>
+                            <span>What can you do?</span>
+                        </button>
                     </div>
                 </div>
             </div>
 
+            <!-- Input area -->
             <div class="input-area">
                 <form id="chat-form">
-                    <div class="marks-selector" id="marks-selector">
-                        <button type="button" class="marks-btn active" data-marks="2">2 Marks</button>
-                        <button type="button" class="marks-btn" data-marks="5">5 Marks</button>
-                        <button type="button" class="marks-btn" data-marks="10">10 Marks</button>
-                        <button type="button" class="marks-btn" data-marks="16">16 Marks</button>
+                    <div class="input-wrapper">
+                        <!-- Marks toggle row -->
+                        <div class="marks-row">
+                            <button type="button" class="marks-toggle" id="marks-toggle" title="Toggle answer length selector">
+                                <i class="fa-solid fa-graduation-cap"></i>
+                                <span class="marks-toggle-label">Exam Mode</span>
+                            </button>
+                            <div class="marks-selector hidden" id="marks-selector">
+                                <button type="button" class="marks-btn" data-marks="2">2M</button>
+                                <button type="button" class="marks-btn" data-marks="5">5M</button>
+                                <button type="button" class="marks-btn" data-marks="10">10M</button>
+                                <button type="button" class="marks-btn" data-marks="16">16M</button>
+                            </div>
+                        </div>
+                        <!-- Input box -->
+                        <div class="input-box">
+                            <textarea id="query-input" placeholder="Message FusionRAG..." rows="1" autocomplete="off"></textarea>
+                            <button type="submit" id="send-btn" title="Send message">
+                                <i class="fa-solid fa-arrow-up"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="input-row">
-                        <input type="text" id="query-input" placeholder="Ask something (e.g. 'what is descriptive analysis')..." autocomplete="off">
-                        <button type="submit" id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
-                    </div>
+                    <p class="input-disclaimer">FusionRAG uses your local PDFs as context. Answers are generated offline by Qwen.</p>
                 </form>
             </div>
         </main>

@@ -113,4 +113,8 @@ The application will now be available in your web browser at: **`http://127.0.0.
 * **`Model not found` errors**: Make sure you have pulled `nomic-embed-text` and `qwen` via the `ollama pull` command.
 * **No context found**: Ensure the PDF you uploaded contains selectable text (not just scanned images). `PyPDF2` requires actual text characters to extract.
 
----
+# FusionRAG Chatbot
+
+Latest GitHub description.
+
+Updated project description.

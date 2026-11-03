@@ -11,6 +11,7 @@ app.config['UPLOAD_FOLDER'] = r"C:\Users\Nandha kishore\Project\data/"
 
 OLLAMA_URL = "http://localhost:11434"
 CHROMA_DB_DIR = "chroma_db"
+MODEL_NAME = "qwen2.5:1.5b"
 
 # Initialize ChromaDB with persistent local storage
 chroma_client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
@@ -123,38 +124,159 @@ def delete_file():
     else:
         return jsonify({'error': 'File not found'})
 
+CASUAL_PATTERNS = [
+    'hi', 'hello', 'hey', 'hii', 'hiii', 'yo', 'sup', 'hola', 'howdy',
+    'good morning', 'good afternoon', 'good evening', 'good night',
+    'how are you', 'what\'s up', 'whats up', 'wassup',
+    'thanks', 'thank you', 'bye', 'goodbye', 'see you',
+    'who are you', 'what can you do', 'help', 'what are you',
+    'nice', 'cool', 'okay', 'ok', 'great', 'awesome', 'wow',
+]
+
+def is_casual_query(query):
+    """Check if the query is a casual/conversational message that doesn't need RAG"""
+    cleaned = query.lower().strip().rstrip('?!.,')
+    # Direct match
+    if cleaned in CASUAL_PATTERNS:
+        return True
+    # Short greetings (1-4 words, no academic terms)
+    words = cleaned.split()
+    if len(words) <= 4:
+        for pattern in CASUAL_PATTERNS:
+            if pattern in cleaned:
+                return True
+    return False
+
 @app.route('/ask', methods=['POST'])
 def ask():
     data = request.json
     query = data.get('query')
-    marks = data.get('marks', '2')  # Default to 2 marks
+    marks = data.get('marks', None)  # None if not provided (normal mode)
     
     if not query:
         return jsonify({'error': 'Empty query'})
+    
+    # Handle casual / conversational queries without RAG
+    if is_casual_query(query):
+        url = f"{OLLAMA_URL}/api/chat"
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are FusionRAG, a friendly AI study assistant. Respond naturally and conversationally. Keep your response short and friendly. You help students by answering questions from their uploaded PDF documents."
+                },
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ],
+            "options": {
+                "num_ctx": 2048,
+                "num_predict": 256,
+                "temperature": 0.7
+            },
+            "stream": True
+        }
+        
+        def generate_casual():
+            # No sources for casual chat
+            yield f"data: {json.dumps({'type': 'sources', 'sources': []})}\n\n"
+            try:
+                response = requests.post(url, json=payload, stream=True, timeout=60)
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if line:
+                        chunk = json.loads(line)
+                        if 'message' in chunk and 'content' in chunk['message']:
+                            content = chunk['message']['content']
+                            yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+                yield "data: [DONE]\n\n"
+            except requests.exceptions.ConnectionError:
+                yield f"data: {json.dumps({'error': 'Cannot connect to Ollama.'})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        return Response(generate_casual(), mimetype='text/event-stream')
         
     if collection.count() == 0:
-        return jsonify({'error': 'No documents indexed yet. Please upload a PDF.'})
+        return jsonify({'error': 'No documents indexed yet. Please upload a PDF first.'})
     
-    # Set answer length instructions based on marks
+    # Set answer length instructions based on marks (only if marks is provided)
     if marks == '2':
-        length_instruction = "You MUST provide a brief and concise answer (3-5 sentences maximum)."
+        length_instruction = (
+            "Write a SHORT answer of about 5 lines (roughly 80-100 words). "
+            "Be concise but complete. Use 2-3 clear sentences to define or explain the concept."
+        )
+        num_predict = 512
+        num_ctx = 4096
     elif marks == '5':
-        length_instruction = "You MUST provide a moderately detailed answer with key points (around 8-12 sentences)."
+        length_instruction = (
+            "Write a MEDIUM-LENGTH answer of about 15 lines (roughly 250-350 words). "
+            "Structure your answer with:\n"
+            "- A brief introduction (1-2 sentences)\n"
+            "- Key points explained clearly using bullet points or numbered lists\n"
+            "- A short conclusion if appropriate\n"
+            "Use markdown formatting: **bold** for key terms, bullet points for lists."
+        )
+        num_predict = 1024
+        num_ctx = 4096
     elif marks == '10':
-        length_instruction = "You MUST provide a detailed and thorough answer with explanations and examples (around 15-25 sentences). Organize with clear points."
+        length_instruction = (
+            "Write a LONG, DETAILED answer of about 30 lines (roughly 500-650 words). "
+            "You MUST structure your answer professionally like a textbook:\n"
+            "- Start with a clear **Introduction** defining the topic\n"
+            "- Use **numbered points** or **subheadings** for each major idea\n"
+            "- Explain each point in 2-3 sentences with examples where possible\n"
+            "- Include a brief **Conclusion** summarizing the key takeaways\n"
+            "Use markdown formatting: ## for headings, **bold** for key terms, "
+            "bullet points and numbered lists for organization. "
+            "Do NOT write a single paragraph — break it into clear sections."
+        )
+        num_predict = 2048
+        num_ctx = 4096
     elif marks == '16':
-        length_instruction = "You MUST provide a very comprehensive, long, essay-style answer. Cover all aspects in extreme depth with definitions, explanations, and examples. Use headings and bullet points. Write a very detailed response suitable for a 16-mark exam answer."
+        length_instruction = (
+            "Write a VERY LONG, COMPREHENSIVE, essay-style answer of about 60 lines (roughly 1000-1300 words). "
+            "This is a high-marks exam answer and MUST be extremely detailed and well-structured.\n\n"
+            "MANDATORY STRUCTURE:\n"
+            "## Introduction\n"
+            "Define the topic and provide context (3-4 sentences).\n\n"
+            "## Main Body\n"
+            "Cover ALL aspects of the topic. Use **multiple subheadings** (### Subheading) for each major concept. "
+            "Under each subheading:\n"
+            "- Provide a clear definition\n"
+            "- Explain with detailed reasoning (3-5 sentences per point)\n"
+            "- Give real-world examples or illustrations\n"
+            "- Use bullet points, numbered lists, and **bold key terms**\n\n"
+            "## Key Features / Characteristics / Advantages (if applicable)\n"
+            "List and explain relevant features in bullet points.\n\n"
+            "## Conclusion\n"
+            "Summarize the main points in 3-4 sentences.\n\n"
+            "IMPORTANT: Do NOT write a single paragraph. Use headings, subheadings, bullet points, "
+            "and numbered lists extensively. The answer must look like a well-organized textbook chapter. "
+            "Write AT LEAST 1000 words."
+        )
+        num_predict = 4096
+        num_ctx = 8192
     else:
-        length_instruction = "Provide a clear and helpful answer."
+        length_instruction = (
+            "Provide a clear, helpful, and well-structured answer. "
+            "Use bullet points or numbered lists if there are multiple points. "
+            "Use **bold** for key terms."
+        )
+        num_predict = 2048
+        num_ctx = 4096
         
     try:
         # 1. Embed query using local Ollama
         query_embedding = get_ollama_embedding(query)
         
-        # 2. Query ChromaDB for the top 3 most relevant chunks to keep context optimal
+        # 2. Query ChromaDB for relevant chunks (more chunks for higher marks)
+        n_chunks = 3 if marks not in ('10', '16') else min(5, collection.count())
         results = collection.query(
             query_embeddings=[query_embedding],
-            n_results=min(3, collection.count())
+            n_results=min(n_chunks, collection.count())
         )
         
         retrieved_context = "\n\n".join(results['documents'][0])
@@ -162,24 +284,43 @@ def ask():
         for meta in results['metadatas'][0]:
             sources.append(f"{meta['source']} (Page {meta['page']})")
             
-        # 3. Generate Answer using local Ollama Qwen model (using /api/chat for instruction-tuned models)
+        # 3. Generate Answer using local Ollama Qwen model
         url = f"{OLLAMA_URL}/api/chat"
         payload = {
-            "model": "qwen",
+            "model": MODEL_NAME,
             "messages": [
                 {
                     "role": "system",
-                    "content": f"You are a helpful academic assistant.\n{length_instruction}\nIf the answer is not in the context, politely explain that the current PDF documents do not seem to contain this information."
+                    "content": (
+                        "You are FusionRAG, an expert academic assistant that writes well-structured, "
+                        "detailed exam answers. You ALWAYS format your answers using markdown with headings, "
+                        "subheadings, bullet points, numbered lists, and bold text for key terms. "
+                        "You NEVER write a single unformatted paragraph. "
+                        "If the answer is not in the context, politely explain that the uploaded documents "
+                        "do not seem to contain this information, but still try to answer from your own knowledge.\n\n"
+                        f"LENGTH REQUIREMENT:\n{length_instruction}"
+                    )
                 },
                 {
                     "role": "user",
-                    "content": f"Using the following context as a foundation, answer the question. Feel free to expand with your own academic knowledge to meet the length requirements.\n\nContext:\n{retrieved_context}\n\nQuestion:\n{query}\n\nIMPORTANT REQUIREMENT: {length_instruction}"
+                    "content": (
+                        f"Answer the following question using the provided context as your primary source. "
+                        f"Supplement with your own academic knowledge to ensure the answer is complete and meets "
+                        f"the required length.\n\n"
+                        f"**Context from uploaded documents:**\n{retrieved_context}\n\n"
+                        f"**Question:** {query}\n\n"
+                        f"**CRITICAL:** {length_instruction}\n"
+                        f"Format your answer with proper markdown: use ## headings, ### subheadings, "
+                        f"**bold key terms**, bullet points (- ), and numbered lists (1. 2. 3.). "
+                        f"DO NOT write a wall of text."
+                    )
                 }
             ],
             "options": {
-                "num_ctx": 4096,
-                "num_predict": 2048,
-                "temperature": 0.3
+                "num_ctx": num_ctx,
+                "num_predict": num_predict,
+                "temperature": 0.4,
+                "repeat_penalty": 1.1
             },
             "stream": True
         }
